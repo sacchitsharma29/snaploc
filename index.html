@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Photo, Location & WhatsApp App</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #eef2f7;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 30px 10px;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 6px 30px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      max-width: 700px;
+      width: 100%;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      color: #222;
+    }
+
+    video, canvas {
+      width: 100%;
+      max-width: 640px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin: 10px 5px;
+    }
+
+    input {
+      padding: 12px;
+      width: 90%;
+      max-width: 500px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    #capture { background-color: #4CAF50; color: white; }
+    #retake { background-color: #f44336; color: white; display: none; }
+    #routeBtn { background-color: #2196F3; color: white; }
+    #geoBtn { background-color: #ff9800; color: white; }
+    #whatsappBtn { background-color: #25D366; color: white; }
+
+    video { transform: scaleX(-1); }
+    canvas { display: none; }
+
+    #output {
+      margin-top: 15px;
+      color: #333;
+      font-weight: bold;
+    }
+
+    hr.section-divider {
+      margin: 40px 0;
+      border: none;
+      height: 2px;
+      background: #ccc;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Photo, Location & WhatsApp App</h1>
+
+    <!-- 📷 Camera Section -->
+    <video id="video" autoplay muted></video>
+    <canvas id="canvas" width="640" height="480"></canvas><br>
+    <button id="capture" onclick="capture()">Capture Photo</button>
+    <button id="retake" onclick="retake()">Retake</button>
+
+    <!-- 📍 Divider -->
+    <hr class="section-divider">
+
+    <!-- 📌 Location & Route -->
+    <input type="text" id="destination" placeholder="Enter address or place (e.g., India Gate)">
+    <br>
+    <button id="geoBtn" onclick="getGeolocation()">Get Coordinates</button>
+    <button id="routeBtn" onclick="showRoute()">Show Route on Google Maps</button>
+    <div id="output"></div>
+
+    <!-- 💬 WhatsApp -->
+    <hr style="margin: 30px 0;">
+    <h3>Send WhatsApp Message</h3>
+    <input type="text" id="whatsappNumber" placeholder="Enter phone number (with country code)">
+    <input type="text" id="whatsappMessage" placeholder="Enter message to send">
+    <br>
+    <button id="whatsappBtn" onclick="sendWhatsApp()">Send via WhatsApp</button>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const captureBtn = document.getElementById('capture');
+    const retakeBtn = document.getElementById('retake');
+    const destinationInput = document.getElementById('destination');
+    const output = document.getElementById('output');
+
+    let currentLat = null;
+    let currentLng = null;
+
+    // Start camera
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+      video.srcObject = stream;
+    }).catch(err => {
+      alert("Unable to access the camera.");
+      console.error(err);
+    });
+
+    // Get geolocation
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        currentLat = position.coords.latitude;
+        currentLng = position.coords.longitude;
+        console.log("Current location:", currentLat, currentLng);
+      },
+      error => {
+        alert("Location access denied.");
+      }
+    );
+
+    function capture() {
+      ctx.save();
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      video.style.display = 'none';
+      canvas.style.display = 'block';
+      captureBtn.style.display = 'none';
+      retakeBtn.style.display = 'inline';
+
+      const link = document.createElement('a');
+      link.download = 'captured-photo.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function retake() {
+      video.style.display = 'block';
+      canvas.style.display = 'none';
+      captureBtn.style.display = 'inline';
+      retakeBtn.style.display = 'none';
+    }
+
+    function getGeolocation() {
+      const destination = destinationInput.value.trim();
+      if (!destination) {
+        alert("Please enter an address or place.");
+        return;
+      }
+
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destination)}`;
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (data.length > 0) {
+            const lat = data[0].lat;
+            const lon = data[0].lon;
+            output.textContent = `Geolocation of "${destination}": Latitude = ${lat}, Longitude = ${lon}`;
+          } else {
+            output.textContent = "Location not found.";
+          }
+        })
+        .catch(error => {
+          output.textContent = "Error fetching geolocation.";
+          console.error(error);
+        });
+    }
+
+    function showRoute() {
+      const destination = destinationInput.value.trim();
+      if (!destination) {
+        alert("Please enter a destination.");
+        return;
+      }
+
+      if (currentLat && currentLng) {
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${currentLat},${currentLng}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+        window.open(mapsUrl, '_blank');
+      } else {
+        alert("Location not available yet. Please wait or allow GPS access.");
+      }
+    }
+
+    function sendWhatsApp() {
+      const phone = document.getElementById('whatsappNumber').value.trim();
+      const message = document.getElementById('whatsappMessage').value.trim();
+
+      if (!phone || !message) {
+        alert("Please enter both phone number and message.");
+        return;
+      }
+
+      const cleanedPhone = phone.replace(/[^\d]/g, '');
+      const whatsappUrl = `https://wa.me/${cleanedPhone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+    }
+  </script>
+
+</body>
+</html>
